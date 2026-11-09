@@ -79,3 +79,67 @@ func TestGetAppUsageSummaryAggregatesRepeatedTitles(t *testing.T) {
 		t.Fatalf("expected chrome total 60 seconds, got %+v", summaries[1])
 	}
 }
+
+func TestDedupeTitles(t *testing.T) {
+	tests := []struct {
+		name   string
+		joined string
+		want   []string
+	}{
+		{"空串", "", nil},
+		{"无重复", "a|b", []string{"a", "b"}},
+		{"有重复保序", "a|b|a|c|b", []string{"a", "b", "c"}},
+		{"单个", "only", []string{"only"}},
+		{"空标题保留", "a||b", []string{"a", "", "b"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := dedupeTitles(tt.joined)
+			if len(got) != len(tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+			for i := range tt.want {
+				if got[i] != tt.want[i] {
+					t.Fatalf("got %v, want %v", got, tt.want)
+				}
+			}
+		})
+	}
+}
+
+func TestHasReport(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "data.db")
+	db, err := Init(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	exists, err := db.HasReport("daily", "2026-06-01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exists {
+		t.Fatal("空库不应报告已生成")
+	}
+
+	if err := db.InsertReport("daily", "2026-06-01", "2026-06-01", "/tmp/a.docx"); err != nil {
+		t.Fatal(err)
+	}
+
+	exists, err = db.HasReport("daily", "2026-06-01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !exists {
+		t.Fatal("插入后应报告已生成")
+	}
+
+	// 其他周期/类型不应误判
+	if exists, _ := db.HasReport("weekly", "2026-06-01"); exists {
+		t.Error("weekly 不应命中 daily 的记录")
+	}
+	if exists, _ := db.HasReport("daily", "2026-06-02"); exists {
+		t.Error("其他日期不应命中")
+	}
+}
