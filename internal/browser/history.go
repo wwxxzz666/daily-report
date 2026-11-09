@@ -3,6 +3,7 @@ package browser
 import (
 	"database/sql"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -46,26 +47,53 @@ func SyncHistory(db *storage.DB, browser string) error {
 	return nil
 }
 
-func syncHistoryFile(db *storage.DB, browser, historyPath, profile string) error {
-	// 浏览器运行时会锁住 History 文件，需要先拷贝
-	// M2: 使用安全临时文件（随机名 + 0600 权限）
-	tmpFile, err := os.CreateTemp("", fmt.Sprintf("dailyreport_%s_%s_*.db", browser, profile))
+// copyToTempFile 把 src 流式拷贝到临时文件（CreateTemp 默认权限 0600）。
+// 返回临时文件路径，调用方负责删除。
+//
+// 原来用 os.ReadFile + os.WriteFile：整个 History 文件（Chrome 常见几十 MB）
+// 先全部读进内存再写出，而生成日报时每次都会触发一次同步。
+func copyToTempFile(src, pattern string) (string, error) {
+	dst, err := os.CreateTemp("", pattern)
 	if err != nil {
-		return fmt.Errorf("创建临时文件失败: %w", err)
+		return "", fmt.Errorf("创建临时文件失败: %w", err)
 	}
-	tmpPath := tmpFile.Name()
-	// 立即关闭，后面用 WriteFile 写入
-	tmpFile.Close()
+	tmpPath := dst.Name()
+
+	cleanup := func() {
+		dst.Close()
+		os.Remove(tmpPath)
+	}
+
+	in, err := os.Open(src)
+	if err != nil {
+		cleanup()
+		return "", fmt.Errorf("打开历史文件失败: %w", err)
+	}
+	defer in.Close()
+
+	if _, err := io.Copy(dst, in); err != nil {
+		cleanup()
+		return "", fmt.Errorf("拷贝历史文件失败: %w", err)
+	}
+	if err := dst.Sync(); err != nil {
+		cleanup()
+		return "", fmt.Errorf("刷新临时文件失败: %w", err)
+	}
+	if err := dst.Close(); err != nil {
+		os.Remove(tmpPath)
+		return "", fmt.Errorf("关闭临时文件失败: %w", err)
+	}
+	return tmpPath, nil
+}
+
+func syncHistoryFile(db *storage.DB, browser, historyPath, profile string) error {
+	// 浏览器运行时会锁住 History 文件，需要先拷贝到临时文件
+	tmpPath, err := copyToTempFile(historyPath, fmt.Sprintf("dailyreport_%s_%s_*.db", browser, profile))
+	if err != nil {
+		return err
+	}
 	// 确保无论成功失败都清理临时文件
 	defer os.Remove(tmpPath)
-
-	srcData, err := os.ReadFile(historyPath)
-	if err != nil {
-		return fmt.Errorf("读取历史文件失败: %w", err)
-	}
-	if err := os.WriteFile(tmpPath, srcData, 0600); err != nil {
-		return fmt.Errorf("拷贝历史文件失败: %w", err)
-	}
 
 	// 打开拷贝的数据库
 	conn, err := sql.Open("sqlite", tmpPath+"?mode=ro")
