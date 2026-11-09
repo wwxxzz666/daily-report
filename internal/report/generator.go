@@ -266,11 +266,8 @@ func (g *Generator) summarizeTitles(titles []string, maxTitles int) string {
 		unique = unique[:maxTitles]
 	}
 
-	result := strings.Join(unique, ", ")
-	if len(result) > 80 {
-		result = result[:77] + "..."
-	}
-	return result
+	// []rune 长度才是人眼看到的字符数，也保证不会把多字节字符切一半
+	return truncate(strings.Join(unique, ", "), 80)
 }
 
 func formatDuration(seconds int) string {
@@ -292,11 +289,18 @@ func extractDomain(url string) string {
 	return url
 }
 
+// truncate 按字符数（rune）截断字符串。
+// 不能用 len(s) / s[:n] 直接切字节：中文是 3 字节，切开后会得到
+// 非法 UTF-8，写进 DOCX 就变成乱码。
 func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
+	if maxLen <= 3 {
+		return ""
+	}
+	r := []rune(s)
+	if len(r) <= maxLen {
 		return s
 	}
-	return s[:maxLen-3] + "..."
+	return string(r[:maxLen-3]) + "..."
 }
 
 func getWeekdayName(w time.Weekday) string {
