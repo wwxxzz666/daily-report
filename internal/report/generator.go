@@ -90,11 +90,7 @@ func (g *Generator) GenerateDailyReport(date time.Time) (string, error) {
 // GenerateWeeklyReport 生成周报
 func (g *Generator) GenerateWeeklyReport(weekEnd time.Time) (string, error) {
 	// 计算本周一到周五
-	weekday := int(weekEnd.Weekday())
-	if weekday == 0 {
-		weekday = 7
-	}
-	monday := weekEnd.AddDate(0, 0, 1-weekday)
+	monday := WeekMonday(weekEnd)
 	friday := monday.AddDate(0, 0, 4)
 
 	// 同步浏览器历史
@@ -312,4 +308,28 @@ func getWeekdayName(w time.Weekday) string {
 func OpenFile(path string) error {
 	cmd := exec.Command("rundll32", "url.dll,FileProtocolHandler", path)
 	return cmd.Run()
+}
+
+// WeekMonday 返回 t 所在自然周的周一（周一为一周起点）。
+func WeekMonday(t time.Time) time.Time {
+	weekday := int(t.Weekday())
+	if weekday == 0 {
+		weekday = 7 // 周日算第 7 天
+	}
+	return t.AddDate(0, 0, 1-weekday)
+}
+
+// ShouldAutoGenerate 判断自动任务是否还需要生成某周期的报告。
+//
+// 定时任务原来只靠内存变量 lastDailyDate 去重，进程重启后当天会再生成
+// 一份（追加一条 generated_reports 记录 + 覆盖 docx）。这里改成查库。
+// 只用于自动触发的场景：用户手动点"生成日报"仍应允许覆盖重生成。
+func ShouldAutoGenerate(db *storage.DB, reportType string, periodStart time.Time) bool {
+	exists, err := db.HasReport(reportType, periodStart.Format("2006-01-02"))
+	if err != nil {
+		// 查不到就宁可生成，不能因为查询失败丢掉报告
+		log.Printf("查询报告生成记录失败，按未生成处理: %v", err)
+		return true
+	}
+	return !exists
 }
