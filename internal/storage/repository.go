@@ -97,16 +97,15 @@ type AppUsageSummary struct {
 
 // GetAppUsageSummary 获取指定时间段的应用使用汇总
 func (db *DB) GetAppUsageSummary(start, end time.Time) ([]AppUsageSummary, error) {
+	// 单次聚合即可：原来的两层 GROUP BY（先按 process+title 汇总，
+	// 再按 process 汇总）只是为了去掉重复标题，而标题在
+	// Generator.summarizeTitles 里本来就会去重，多扫一遍没有收益。
 	rows, err := db.Query(`
 		SELECT process_name,
 			   SUM(duration_sec) as total_sec,
 			   GROUP_CONCAT(window_title, '|') as titles
-		FROM (
-			SELECT process_name, window_title, SUM(duration_sec) as duration_sec
-			FROM window_activities
-			WHERE started_at >= ? AND started_at < ?
-			GROUP BY process_name, window_title
-		)
+		FROM window_activities
+		WHERE started_at >= ? AND started_at < ?
 		GROUP BY process_name
 		ORDER BY total_sec DESC`,
 		start, end,
@@ -123,10 +122,29 @@ func (db *DB) GetAppUsageSummary(start, end time.Time) ([]AppUsageSummary, error
 		if err := rows.Scan(&s.ProcessName, &s.TotalSec, &titlesStr); err != nil {
 			return nil, err
 		}
-		s.Titles = strings.Split(titlesStr, "|")
+		s.Titles = dedupeTitles(titlesStr)
 		summaries = append(summaries, s)
 	}
 	return summaries, rows.Err()
+}
+
+// dedupeTitles 把 GROUP_CONCAT 出来的 "a|b|a" 拆开并保持首次出现顺序去重。
+// 单层聚合后同一标题会出现多次（不同时间段的同名窗口），
+// 调用方（报表层）依赖 Titles 是去重后的集合。
+func dedupeTitles(joined string) []string {
+	if joined == "" {
+		return nil
+	}
+	seen := make(map[string]struct{})
+	out := make([]string, 0, 8)
+	for _, title := range strings.Split(joined, "|") {
+		if _, ok := seen[title]; ok {
+			continue
+		}
+		seen[title] = struct{}{}
+		out = append(out, title)
+	}
+	return out
 }
 
 // InsertBrowserVisits 批量插入浏览器访问记录
@@ -230,4 +248,19 @@ func (db *DB) CleanupOldActivities(days int) error {
 		return fmt.Errorf("清理浏览器访问记录失败: %w", err)
 	}
 	return nil
+}
+
+// HasReport 判断某类型的报告在指定周期是否已生成过。
+// 定时任务重启后需要靠它避免同一天重复生成。
+func (db *DB) HasReport(reportType, periodStart string) (bool, error) {
+	var count int
+	err := db.QueryRow(`
+		SELECT COUNT(*) FROM generated_reports
+		WHERE report_type = ? AND period_start = ?`,
+		reportType, periodStart,
+	).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }

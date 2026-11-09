@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS window_activities (
 );
 CREATE INDEX IF NOT EXISTS idx_wa_started_at ON window_activities(started_at);
 CREATE INDEX IF NOT EXISTS idx_wa_process_name ON window_activities(process_name);
+-- 报表按 process_name 聚合 + 时间范围过滤，复合索引可以省掉一次排序
+CREATE INDEX IF NOT EXISTS idx_wa_process_started ON window_activities(process_name, started_at);
 
 CREATE TABLE IF NOT EXISTS browser_visits (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,6 +67,11 @@ func Init(dbPath string) (*DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("打开数据库失败: %w", err)
 	}
+
+	// SQLite 只支持单写者。database/sql 默认开多个连接，
+	// WAL 模式下并发写会撞 SQLITE_BUSY（busy_timeout 只能缓解）。
+	// 采样器每 5 秒写一次、Dashboard 同时在读，限制成单连接最稳。
+	db.SetMaxOpenConns(1)
 
 	// SQLite 优化设置
 	pragmas := []string{

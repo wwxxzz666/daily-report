@@ -117,16 +117,26 @@ func (a *App) startup(ctx context.Context) {
 	// 启动定时调度
 	a.sched = scheduler.New()
 	a.sched.OnDailyReport(func() {
+		now := time.Now()
+		if !report.ShouldAutoGenerate(db, "daily", now) {
+			log.Println("今日日报已生成过，跳过自动生成")
+			return
+		}
 		c := config.Get()
 		gen := report.NewGenerator(db, c)
-		if _, err := gen.GenerateDailyReport(time.Now()); err != nil {
+		if _, err := gen.GenerateDailyReport(now); err != nil {
 			log.Printf("自动生成日报失败: %v", err)
 		}
 	})
 	a.sched.OnWeeklyReport(func() {
+		now := time.Now()
+		if !report.ShouldAutoGenerate(db, "weekly", report.WeekMonday(now)) {
+			log.Println("本周周报已生成过，跳过自动生成")
+			return
+		}
 		c := config.Get()
 		gen := report.NewGenerator(db, c)
-		if _, err := gen.GenerateWeeklyReport(time.Now()); err != nil {
+		if _, err := gen.GenerateWeeklyReport(now); err != nil {
 			log.Printf("自动生成周报失败: %v", err)
 		}
 	})
