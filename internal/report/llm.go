@@ -2,11 +2,11 @@ package report
 
 import (
 	"bytes"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -70,13 +70,9 @@ func CallLLM(cfg *config.Config, systemPrompt, userMessage string) (string, erro
 	}
 
 	timeout := cfg.GetLLMTimeout()
-	// 国内网络环境 OCSP 常被阻断，跳过 TLS 证书吊销检查
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
-	}
-	client := &http.Client{Timeout: timeout, Transport: transport}
+	// 复用 http.DefaultTransport，保证连接池与 keep-alive 生效。
+	// 注意：不要开启 InsecureSkipVerify —— 那会让 API Key 在中间人攻击下明文暴露。
+	client := &http.Client{Timeout: timeout}
 
 	var lastErr error
 	for attempt := 0; attempt < 3; attempt++ {
@@ -136,6 +132,17 @@ func CallLLM(cfg *config.Config, systemPrompt, userMessage string) (string, erro
 	return "", fmt.Errorf("重试 3 次后仍然失败: %w", lastErr)
 }
 
-func isLocalhost(url string) bool {
-	return strings.Contains(url, "localhost") || strings.Contains(url, "127.0.0.1")
+// isLocalhost 判断端点是否指向本机。
+// 必须解析出 Host 再比较：用 strings.Contains 会被
+// "http://evil.example/?x=localhost" 这类 URL 绕过。
+func isLocalhost(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	switch strings.ToLower(u.Hostname()) {
+	case "localhost", "127.0.0.1", "::1":
+		return true
+	}
+	return false
 }
