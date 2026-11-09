@@ -30,10 +30,10 @@ var (
 )
 
 const (
-	PROCESS_QUERY_INFORMATION       = 0x0400
+	PROCESS_QUERY_INFORMATION         = 0x0400
 	PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-	PROCESS_VM_READ                  = 0x0010
-	PROCESS_ALL_ACCESS               = 0x1F0FFF
+	PROCESS_VM_READ                   = 0x0010
+	PROCESS_ALL_ACCESS                = 0x1F0FFF
 )
 
 // GetActiveWindow 获取当前前台窗口的进程名和标题

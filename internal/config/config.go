@@ -11,14 +11,14 @@ import (
 )
 
 type Config struct {
-	WorkTime        WorkTimeConfig `yaml:"work_time"`
-	SampleInterval  string         `yaml:"sample_interval"`
-	MonitoredApps   []string       `yaml:"monitored_apps"`
-	IgnoredApps     []string       `yaml:"ignored_apps"`
-	SensitiveWords  []string       `yaml:"sensitive_words"`
-	Browser         BrowserConfig  `yaml:"browser"`
-	LLM             LLMConfig      `yaml:"llm"`
-	Report          ReportConfig   `yaml:"report"`
+	WorkTime       WorkTimeConfig `yaml:"work_time"`
+	SampleInterval string         `yaml:"sample_interval"`
+	MonitoredApps  []string       `yaml:"monitored_apps"`
+	IgnoredApps    []string       `yaml:"ignored_apps"`
+	SensitiveWords []string       `yaml:"sensitive_words"`
+	Browser        BrowserConfig  `yaml:"browser"`
+	LLM            LLMConfig      `yaml:"llm"`
+	Report         ReportConfig   `yaml:"report"`
 }
 
 type WorkTimeConfig struct {
@@ -34,22 +34,22 @@ type BrowserConfig struct {
 }
 
 type LLMConfig struct {
-	Provider     string  `yaml:"provider"`      // 预设提供商名称
-	Endpoint     string  `yaml:"endpoint"`      // 自定义端点（provider 为空或 "custom" 时使用）
-	Model        string  `yaml:"model"`         // 模型名称（空则使用预设默认值）
-	APIKey       string  `yaml:"api_key"`
-	Temperature  float64 `yaml:"temperature"`
-	MaxTokens    int     `yaml:"max_tokens"`
-	Timeout      string  `yaml:"timeout"`
+	Provider    string  `yaml:"provider"` // 预设提供商名称
+	Endpoint    string  `yaml:"endpoint"` // 自定义端点（provider 为空或 "custom" 时使用）
+	Model       string  `yaml:"model"`    // 模型名称（空则使用预设默认值）
+	APIKey      string  `yaml:"api_key"`
+	Temperature float64 `yaml:"temperature"`
+	MaxTokens   int     `yaml:"max_tokens"`
+	Timeout     string  `yaml:"timeout"`
 }
 
 // ProviderPreset 预设提供商配置
 type ProviderPreset struct {
-	Name        string
-	Endpoint    string
+	Name         string
+	Endpoint     string
 	DefaultModel string
-	NeedsAPIKey bool
-	Description string
+	NeedsAPIKey  bool
+	Description  string
 }
 
 // SupportedProviders 返回所有支持的预设提供商
@@ -91,7 +91,7 @@ func SupportedProviders() []ProviderPreset {
 			Description:  "智谱清言（GLM-4）",
 		},
 		{
-			Name:         "ollama",
+			Name: "ollama",
 			// Ollama 本地服务默认不启用 TLS，必须用 http://，否则 TLS 握手直接失败
 			Endpoint:     "http://localhost:11434/v1/chat/completions",
 			DefaultModel: "qwen2.5:7b",
@@ -99,7 +99,7 @@ func SupportedProviders() []ProviderPreset {
 			Description:  "Ollama 本地模型（数据不出本机，隐私最佳）",
 		},
 		{
-			Name:         "lmstudio",
+			Name: "lmstudio",
 			// LM Studio OpenAI 兼容服务器默认监听明文 HTTP
 			Endpoint:     "http://localhost:1234/v1/chat/completions",
 			DefaultModel: "default",
@@ -189,13 +189,13 @@ func defaultConfig() *Config {
 			HistoryHours: 8,
 		},
 		LLM: LLMConfig{
-			Provider:     "deepseek",
-			Endpoint:     "",
-			Model:        "",
-			APIKey:       "sk-xxx",
-			Temperature:  0.7,
-			MaxTokens:    4096,
-			Timeout:      "60s",
+			Provider:    "deepseek",
+			Endpoint:    "",
+			Model:       "",
+			APIKey:      "sk-xxx",
+			Temperature: 0.7,
+			MaxTokens:   4096,
+			Timeout:     "60s",
 		},
 		Report: ReportConfig{
 			OutputDir:  filepath.Join(appDataDir(), "reports"),
