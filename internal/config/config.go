@@ -92,14 +92,16 @@ func SupportedProviders() []ProviderPreset {
 		},
 		{
 			Name:         "ollama",
-			Endpoint:     "https://localhost:11434/v1/chat/completions",
+			// Ollama 本地服务默认不启用 TLS，必须用 http://，否则 TLS 握手直接失败
+			Endpoint:     "http://localhost:11434/v1/chat/completions",
 			DefaultModel: "qwen2.5:7b",
 			NeedsAPIKey:  false,
 			Description:  "Ollama 本地模型（数据不出本机，隐私最佳）",
 		},
 		{
 			Name:         "lmstudio",
-			Endpoint:     "https://localhost:1234/v1/chat/completions",
+			// LM Studio OpenAI 兼容服务器默认监听明文 HTTP
+			Endpoint:     "http://localhost:1234/v1/chat/completions",
 			DefaultModel: "default",
 			NeedsAPIKey:  false,
 			Description:  "LM Studio 本地模型",
