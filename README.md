@@ -102,7 +102,7 @@ llm:
 │   ├── config/             # 配置加载与保存
 │   ├── monitor/            # 窗口采样器（Windows API 调用）
 │   ├── browser/            # 浏览器历史同步（Chrome/Edge）
-│   ├── report/             # 报告生成 + LLM 调用
+│   ├── report/             # 报告生成 + LLM 调用（prompt_*.txt 用 go:embed 打包）
 │   ├── scheduler/          # 定时任务调度
 │   ├── storage/            # SQLite 数据库操作
 │   └── privacy/            # 隐私保护（脱敏、过滤）
@@ -113,7 +113,6 @@ llm:
 │           ├── Dashboard   # 仪表盘（状态、今日活动、快捷操作）
 │           ├── Reports     # 报告历史列表
 │           └── Settings    # 设置页（LLM、工作时间）
-├── assets/                 # Prompt 模板
 └── config.example.yaml     # 配置文件示例
 ```
 
