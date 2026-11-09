@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	_ "modernc.org/sqlite"
 )
@@ -53,11 +54,11 @@ type DB struct {
 }
 
 func Init(dbPath string) (*DB, error) {
-	dir := dbPath[:len(dbPath)-len("/data.db")]
-	if dir != "" {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return nil, fmt.Errorf("创建数据库目录失败: %w", err)
-		}
+	// 用 filepath.Dir 而不是按 "/data.db" 的固定长度切字符串：
+	// 文件名一旦不是 data.db，旧实现会切出错误目录甚至越界 panic。
+	dir := filepath.Dir(dbPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, fmt.Errorf("创建数据库目录失败: %w", err)
 	}
 
 	db, err := sql.Open("sqlite", dbPath)
